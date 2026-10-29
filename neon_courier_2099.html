@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEON COURIER 2099 - Cyberpunk 3D Arcade</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff007f;
+            --neon-yellow: #fcee0a;
+            --neon-purple: #b500ff;
+        }
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #05020a;
+            font-family: 'Rajdhani', sans-serif;
+            color: #e2f1ff;
+        }
+        .font-cyber {
+            font-family: 'Orbitron', sans-serif;
+        }
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        /* Cyberpunk Scanlines & Vignette */
+        .crt-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+            background: 
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                radial-gradient(circle at center, transparent 55%, rgba(3, 0, 12, 0.85) 100%);
+            background-size: 100% 4px, 100% 100%;
+        }
+        /* Glitch Effect for EMP Cargo */
+        @keyframes empGlitch {
+            0% { transform: translate(0, 0) skew(0deg); filter: hue-rotate(0deg); }
+            20% { transform: translate(-6px, 2px) skew(4deg); filter: hue-rotate(90deg) invert(0.15); }
+            40% { transform: translate(6px, -3px) skew(-4deg); opacity: 0.4; }
+            60% { transform: translate(-3px, 0) skew(2deg); filter: hue-rotate(-90deg); }
+            80% { transform: translate(4px, 2px) skew(-2deg); opacity: 0.75; }
+            100% { transform: translate(0, 0) skew(0deg); filter: hue-rotate(0deg); }
+        }
+        .emp-active {
+            animation: empGlitch 0.28s infinite;
+        }
+        .cyber-panel {
+            background: rgba(8, 11, 24, 0.82);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(0, 243, 255, 0.35);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.12), inset 0 0 15px rgba(0, 243, 255, 0.06);
+            clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+        }
+        .cyber-panel-pink {
+            background: rgba(20, 6, 24, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 0, 127, 0.45);
+            box-shadow: 0 0 20px rgba(255, 0, 127, 0.15), inset 0 0 15px rgba(255, 0, 127, 0.08);
+            clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+        }
+        .cyber-btn {
+            position: relative;
+            background: linear-gradient(135deg, rgba(0, 243, 255, 0.18), rgba(181, 0, 255, 0.18));
+            border: 1px solid var(--neon-cyan);
+            color: #fff;
+            transition: all 0.2s ease;
+            clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+        }
+        .cyber-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, rgba(0, 243, 255, 0.4), rgba(255, 0, 127, 0.4));
+            box-shadow: 0 0 18px rgba(0, 243, 255, 0.5);
+            transform: translateY(-1px);
+        }
+        .cyber-btn:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+        .cyber-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            border-color: #555;
+        }
+        .neon-text-cyan {
+            text-shadow: 0 0 8px rgba(0, 243, 255, 0.8);
+        }
+        .neon-text-pink {
+            text-shadow: 0 0 8px rgba(255, 0, 127, 0.8);
+        }
+        .neon-text-yellow {
+            text-shadow: 0 0 8px rgba(252, 238, 10, 0.8);
+        }
+        /* Speed lines overlay */
+        #speed-lines {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 8;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            background: radial-gradient(circle, transparent 45%, rgba(0, 243, 255, 0.22) 95%);
+        }
+        /* Damage flash overlay */
+        #damage-flash {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9;
+            opacity: 0;
+            background: radial-gradient(circle, transparent 30%, rgba(255, 0, 85, 0.55) 100%);
+            transition: opacity 0.15s ease;
+        }
+        /* Custom Scrollbar for Modals */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(5, 2, 10, 0.8);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--neon-cyan);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Visual Overlays -->
+    <div id="speed-lines"></div>
+    <div id="damage-flash"></div>
+    <div class="crt-overlay"></div>
+
+    <!-- HUD CONTAINER -->
+    <div id="hud-container" class="relative z-20 w-full h-full pointer-events-none flex flex-col justify-between p-2 sm:p-4">
+        
+        <!-- TOP HUD BAR -->
+        <div class="flex flex-wrap items-start justify-between gap-2 w-full">
+            
+            <!-- Left: Brand, Sector & Credits -->
+            <div class="cyber-panel p-2.5 sm:p-3.5 pointer-events-auto flex flex-col gap-1.5 min-w-[230px] sm:min-w-[280px]">
+                <div class="flex items-center justify-between border-b border-cyan-500/30 pb-1">
+                    <div>
+                        <span class="font-cyber text-xs sm:text-sm font-black tracking-wider text-cyan-400 neon-text-cyan">NEON COURIER 2099</span>
+                        <div id="hud-district-name" class="text-[11px] font-bold text-fuchsia-400 tracking-widest uppercase">SECTOR-01: NEON SLUMS</div>
+                    </div>
+                    <button id="btn-audio-toggle" class="cyber-btn px-2 py-1 text-xs font-cyber" title="Toggle Audio">
+                        🔊 SFX
+                    </button>
+                </div>
+
+                <!-- Credits & Daily Target -->
+                <div class="flex items-baseline justify-between pt-0.5">
+                    <span class="text-xs text-slate-400 uppercase font-semibold">KREDIT SALDO:</span>
+                    <span id="hud-credits" class="font-cyber text-lg sm:text-xl font-black text-yellow-300 neon-text-yellow">¢ 250</span>
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-[11px] font-semibold mb-0.5">
+                        <span class="text-cyan-300">TARGET HARIAN</span>
+                        <span id="hud-daily-text" class="font-cyber text-yellow-300">¢250 / ¢1500</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-900/90 rounded overflow-hidden border border-cyan-500/30">
+                        <div id="hud-daily-bar" class="h-full bg-gradient-to-r from-cyan-400 via-fuchsia-500 to-yellow-400 transition-all duration-300" style="width: 16%"></div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-[11px] text-slate-300 pt-0.5 border-t border-slate-800">
+                    <span>PENGIRIMAN SUKSES: <strong id="hud-deliveries" class="text-cyan-300 font-cyber">0</strong></span>
+                    <span>MAX COMBO: <strong id="hud-max-combo" class="text-fuchsia-400 font-cyber">0x</strong></span>
+                </div>
+            </div>
+
+            <!-- Center: Active Contract Status -->
+            <div id="hud-contract-box" class="cyber-panel-pink p-2.5 sm:p-3.5 pointer-events-auto flex-1 max-w-md mx-auto">
+                <div class="flex items-center justify-between border-b border-pink-500/30 pb-1 mb-1.5">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-pink-500 animate-ping"></span>
+                        <span class="font-cyber text-xs sm:text-sm font-bold text-pink-400 neon-text-pink uppercase tracking-wider" id="hud-contract-title">KONTRAK AKTIF: STANDARD DROP</span>
+                    </div>
+                    <span id="hud-contract-reward" class="font-cyber text-xs sm:text-sm font-black text-yellow-300 bg-pink-950/80 px-2 py-0.5 rounded border border-yellow-400/40">+¢350</span>
+                </div>
+
+                <!-- Distance & Timer -->
+                <div class="grid grid-cols-2 gap-2 text-center mb-1.5">
+                    <div class="bg-slate-950/70 p-1.5 rounded border border-cyan-500/30">
+                        <div class="text-[10px] text-slate-400 uppercase">JARAK DROP-OFF BEACON</div>
+                        <div id="hud-distance" class="font-cyber text-base sm:text-lg font-black text-cyan-300">1200 M</div>
+                    </div>
+                    <div class="bg-slate-950/70 p-1.5 rounded border border-pink-500/30">
+                        <div class="text-[10px] text-slate-400 uppercase">WAKTU TERSISA</div>
+                        <div id="hud-timer" class="font-cyber text-base sm:text-lg font-black text-yellow-300">45.0s</div>
+                    </div>
+                </div>
+
+                <!-- Special Package Status Bar (Fragile / Thermal / EMP) -->
+                <div id="hud-special-wrap" class="hidden mb-1">
+                    <div class="flex justify-between text-[11px] font-bold mb-0.5">
+                        <span id="hud-special-label" class="text-amber-300 uppercase">INTEGRITAS PAKET</span>
+                        <span id="hud-special-val" class="font-cyber text-amber-300">100%</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-950 rounded overflow-hidden border border-amber-400/40">
+                        <div id="hud-special-bar" class="h-full bg-gradient-to-r from-emerald-400 to-amber-400 transition-all duration-150" style="width: 100%"></div>
+                    </div>
+                </div>
+
+                <!-- Modifier Badges -->
+                <div id="hud-modifiers" class="flex flex-wrap gap-1 mt-1"></div>
+            </div>
+
+            <!-- Right: Quick Actions & Combo -->
+            <div class="flex flex-col items-end gap-2 pointer-events-auto">
+                <div class="flex gap-2">
+                    <button id="btn-open-contracts" class="cyber-btn px-3 py-2 font-cyber text-xs font-bold tracking-wider flex items-center gap-1.5">
+                        <span>📦</span> PILIH KONTRAK
+                    </button>
+                    <button id="btn-open-garage" class="cyber-btn px-3 py-2 font-cyber text-xs font-bold tracking-wider flex items-center gap-1.5 border-fuchsia-400">
+                        <span>🔧</span> UPGRADE GARAJ
+                    </button>
+                </div>
+
+                <!-- Near-Miss Combo Box -->
+                <div id="hud-combo-panel" class="cyber-panel px-3 py-1.5 text-right transition-transform duration-150 scale-95 opacity-80">
+                    <div class="text-[10px] text-cyan-300 uppercase tracking-widest">NEAR-MISS COMBO</div>
+                    <div class="flex items-baseline justify-end gap-2">
+                        <span id="hud-combo-count" class="font-cyber text-xl sm:text-2xl font-black text-fuchsia-400 neon-text-pink">0x</span>
+                        <span id="hud-combo-bonus" class="text-xs font-bold text-yellow-300">+¢0</span>
+                    </div>
+                </div>
+
+                <!-- Security Drone Alert Banner -->
+                <div id="hud-drone-alert" class="hidden cyber-panel-pink px-3 py-1.5 border-red-500 bg-red-950/80 animate-pulse">
+                    <div class="font-cyber text-xs font-black text-red-400 flex items-center gap-1.5">
+                        <span>⚠️</span> DRONE KEAMANAN MENGUNCI TARGET!
+                    </div>
+                    <div class="text-[11px] text-red-200">Hindari garis bidik laser merah di jalur!</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER DYNAMIC NOTIFICATION TOAST -->
+        <div id="hud-toast" class="pointer-events-none self-center my-auto text-center transition-all duration-300 opacity-0 transform -translate-y-4">
+            <div id="hud-toast-title" class="font-cyber text-xl sm:text-3xl font-black text-cyan-300 neon-text-cyan tracking-widest uppercase">PENGIRIMAN BERHASIL!</div>
+            <div id="hud-toast-sub" class="text-sm sm:text-base font-bold text-yellow-300 bg-slate-950/85 px-4 py-1 rounded border border-cyan-400/40 mt-1 inline-block">+¢450 KREDIT DITERIMA</div>
+        </div>
+
+        <!-- BOTTOM HUD: Cockpit Telemetry & Touch Controls -->
+        <div class="flex flex-col sm:flex-row items-end justify-between gap-3 w-full">
+            
+            <!-- Left Telemetry: Hull & Boost Energy -->
+            <div class="cyber-panel p-3 w-full sm:w-80 pointer-events-auto">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-cyber text-xs font-bold text-cyan-400">KAZE-01 HOVERBIKE</span>
+                    <button id="btn-repair-quick" class="text-[11px] font-cyber bg-emerald-950/90 hover:bg-emerald-800 text-emerald-300 border border-emerald-400/50 px-2 py-0.5 rounded transition">
+                        REPARASIINSTAN (¢100)
+                    </button>
+                </div>
+
+                <!-- Hull Bar -->
+                <div class="mb-2">
+                    <div class="flex justify-between text-xs font-bold mb-0.5">
+                        <span class="text-rose-400">KONDISI HULL (ARMOR)</span>
+                        <span id="hud-hull-text" class="font-cyber text-rose-300">100%</span>
+                    </div>
+                    <div class="w-full h-2.5 bg-slate-950 rounded overflow-hidden border border-rose-500/40">
+                        <div id="hud-hull-bar" class="h-full bg-gradient-to-r from-rose-600 to-emerald-400 transition-all duration-150" style="width: 100%"></div>
+                    </div>
+                </div>
+
+                <!-- Boost Battery Bar -->
+                <div>
+                    <div class="flex justify-between text-xs font-bold mb-0.5">
+                        <span class="text-cyan-300">OVERCLOCK BOOST [SHIFT/SPACE]</span>
+                        <span id="hud-boost-text" class="font-cyber text-cyan-300">100%</span>
+                    </div>
+                    <div class="w-full h-2.5 bg-slate-950 rounded overflow-hidden border border-cyan-400/40">
+                        <div id="hud-boost-bar" class="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-fuchsia-400 transition-all duration-75" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile / On-Screen Touch Controls -->
+            <div class="flex items-center justify-center gap-2 pointer-events-auto w-full sm:w-auto">
+                <button id="touch-left" class="cyber-btn px-4 py-3 sm:px-3.5 sm:py-2.5 font-cyber text-sm font-bold active:scale-95">◀ KIRI</button>
+                <button id="touch-brake" class="cyber-btn px-3 py-3 sm:px-3 sm:py-2.5 font-cyber text-xs font-bold border-rose-400 text-rose-200">REM</button>
+                <button id="touch-boost" class="cyber-btn px-4 py-3 sm:px-4 sm:py-2.5 font-cyber text-xs sm:text-sm font-black border-yellow-400 text-yellow-300 bg-fuchsia-950/60">⚡ BOOST</button>
+                <button id="touch-gas" class="cyber-btn px-3 py-3 sm:px-3 sm:py-2.5 font-cyber text-xs font-bold border-emerald-400 text-emerald-200">GAS</button>
+                <button id="touch-right" class="cyber-btn px-4 py-3 sm:px-3.5 sm:py-2.5 font-cyber text-sm font-bold active:scale-95">KANAN ▶</button>
+            </div>
+
+            <!-- Right Telemetry: Speedometer -->
+            <div class="cyber-panel p-3 min-w-[180px] sm:min-w-[210px] text-right pointer-events-auto hidden sm:block">
+                <div class="text-[10px] text-slate-400 uppercase tracking-widest">KECEPATAN HOVER</div>
+                <div class="flex items-baseline justify-end gap-1">
+                    <span id="hud-speed" class="font-cyber text-3xl sm:text-4xl font-black text-cyan-300 neon-text-cyan">180</span>
+                    <span class="font-cyber text-xs text-fuchsia-400 font-bold">KM/H</span>
+                </div>
+                <div class="text-[11px] text-slate-400 mt-0.5">
+                    kontrol: <span class="text-cyan-300 font-semibold">W/A/S/D</span> + <span class="text-yellow-300 font-semibold">SHIFT</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CONTRACT BOARD & GARAGE HUB -->
+    <div id="hub-modal" class="fixed inset-0 z-30 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
+        <div class="cyber-panel w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border-2 border-cyan-400/60">
+            
+            <!-- Modal Header -->
+            <div class="flex flex-wrap items-center justify-between gap-2 p-4 bg-slate-900/90 border-b border-cyan-500/40">
+                <div>
+                    <h1 class="font-cyber text-lg sm:text-2xl font-black text-cyan-300 neon-text-cyan tracking-wider">
+                        TERMINAL KURIR // NEON COURIER 2099
+                    </h1>
+                    <p class="text-xs sm:text-sm text-slate-300">Pilih kontrak pengiriman berisiko tinggi atau tingkatkan performa hoverbike <span class="text-fuchsia-400 font-bold">Kaze-01</span>.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="bg-slate-950 px-3 py-1.5 rounded border border-yellow-400/50 text-right">
+                        <div class="text-[10px] text-slate-400 uppercase">SALDO KREDIT</div>
+                        <div id="modal-credits" class="font-cyber text-lg font-black text-yellow-300">¢ 250</div>
+                    </div>
+                    <button id="btn-resume-game" class="cyber-btn px-4 py-2.5 font-cyber text-xs sm:text-sm font-black bg-cyan-500/30 border-cyan-300">
+                        LANJUT BERKENDARA ▶
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="flex border-b border-cyan-500/30 bg-slate-950/60 px-4 pt-2 gap-2">
+                <button id="tab-btn-contracts" class="px-4 py-2 font-cyber text-xs sm:text-sm font-bold border-b-2 border-cyan-400 text-cyan-300 bg-cyan-950/40">
+                    📦 BURSA KONTRAK (3 TERSEDIA)
+                </button>
+                <button id="tab-btn-garage" class="px-4 py-2 font-cyber text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200">
+                    🔧 UPGRADE GARAJ & DISTRIK
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
+                
+                <!-- TAB 1: CONTRACTS -->
+                <div id="tab-content-contracts" class="space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-900/70 p-3 rounded border border-cyan-500/30">
+                        <div class="text-xs sm:text-sm text-slate-200">
+                            💡 <strong class="text-cyan-300">Tips Kurir:</strong> Lewati garis hijau di ujung jarak kontrak (<strong class="text-emerald-300">DROP-OFF BEACON</strong>) sebelum waktu habis. Hindari tabrakan dan pepet kendaraan lain untuk <strong class="text-fuchsia-400">Near-Miss Combo</strong>!
+                        </div>
+                        <button id="btn-refresh-contracts" class="cyber-btn px-3 py-1.5 font-cyber text-xs font-bold">
+                            🔄 ACAK KONTRAK BARU
+                        </button>
+                    </div>
+
+                    <!-- 3 Contract Cards Grid -->
+                    <div id="contract-cards-container" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+                </div>
+
+                <!-- TAB 2: GARAGE & DISTRICTS -->
+                <div id="tab-content-garage" class="hidden space-y-5">
+                    
+                    <!-- Vehicle Upgrades -->
+                    <div>
+                        <h3 class="font-cyber text-sm font-bold text-cyan-300 uppercase tracking-wider mb-2.5">MODIFIKASI HOVERBIKE KAZE-01</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="upgrade-cards-container">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+
+                    <!-- District Unlock / Selection -->
+                    <div>
+                        <h3 class="font-cyber text-sm font-bold text-fuchsia-400 uppercase tracking-wider mb-2.5">PILIH ZONA DISTRIK KOTA 2099</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="district-cards-container">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer Controls Guide -->
+            <div class="p-3 bg-slate-950/90 border-t border-cyan-500/30 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
+                <div>
+                    <span class="text-cyan-300 font-bold">W / ▲</span> Gas &nbsp;|&nbsp;
+                    <span class="text-cyan-300 font-bold">S / ▼</span> Rem &nbsp;|&nbsp;
+                    <span class="text-cyan-300 font-bold">A/D atau ◀/▶</span> Kemudi Jalur &nbsp;|&nbsp;
+                    <span class="text-yellow-300 font-bold">SHIFT / SPACE</span> Overclock Boost
+                </div>
+                <div class="text-fuchsia-400 font-semibold">Lewati Jalur Hijau Energi di jalan raya untuk isi ulang baterai & hull!</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /********************************************************************
+         * 1. WEB AUDIO SYNTHESIZER (Cyberpunk Sound Effects & Engine Hum)
+         ********************************************************************/
+        class CyberAudio {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+                this.engineOsc = null;
+                this.engineGain = null;
+            }
+
+            init() {
+                if (this.ctx) return;
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                this.ctx = new AudioCtx();
+
+                // Continuous futuristic hover engine hum
+                this.engineOsc = this.ctx.createOscillator();
+                this.engineGain = this.ctx.createGain();
+                this.engineOsc.type = 'sawtooth';
+                this.engineOsc.frequency.value = 55;
+                
+                // Lowpass filter for warm cyberpunk bass hum
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 240;
+
+                this.engineGain.gain.value = 0.04;
+                this.engineOsc.connect(filter);
+                filter.connect(this.engineGain);
+                this.engineGain.connect(this.ctx.destination);
+                this.engineOsc.start();
+            }
+
+            updateEngine(speedRatio, isBoosting, isPaused) {
+                if (!this.ctx || !this.engineOsc) return;
+                if (!this.enabled || isPaused) {
+                    this.engineGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+                    return;
+                }
+                const targetFreq = 50 + speedRatio * 95 + (isBoosting ? 45 : 0);
+                const targetGain = 0.035 + speedRatio * 0.03 + (isBoosting ? 0.025 : 0);
+                this.engineOsc.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.08);
+                this.engineGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.08);
+            }
+
+            playBoost() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.exponentialRampToValueAtTime(520, now + 0.28);
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+
+            playCrash() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(130, now);
+                osc.frequency.exponentialRampToValueAtTime(32, now + 0.25);
+                gain.gain.setValueAtTime(0.18, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.26);
+            }
+
+            playNearMiss() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(520, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+                gain.gain.setValueAtTime(0.09, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.13);
+            }
+
+            playDeliverySuccess() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+                const notes = [523.25, 659.25, 783.99, 1046.5];
+                notes.forEach((freq, idx) => {
+                    const now = this.ctx.currentTime + idx * 0.08;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                });
+            }
+
+            playSirenBeep() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(740, now);
+                osc.frequency.setValueAtTime(520, now + 0.1);
+                gain.gain.setValueAtTime(0.07, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.22);
+            }
+        }
+
+        const audio = new CyberAudio();
+
+        /********************************************************************
+         * 2. GAME STATE, DISTRICTS, UPGRADES & CONTRACTS DATA
+         ********************************************************************/
+        const LANE_X = [-8, -4, 0, 4, 8]; // 5 Highway Lanes
+
+        const DISTRICTS = [
+            {
+                id: 0,
+                name: 'SECTOR-01: NEON SLUMS',
+                subtitle: 'Distrik komersial padat dengan lalu lintas standar.',
+                fogColor: 0x090418,
+                gridColor: 0x00f3ff,
+                trafficSpeedMult: 1.0,
+                payoutMult: 1.0,
+                unlockCost: 0,
+                unlocked: true
+            },
+            {
+                id: 1,
+                name: 'SECTOR-02: CORPORATE SKYWAY',
+                subtitle: 'Jalan layang eksekutif. Kendaraan otonom melaju cepat & agresif.',
+                fogColor: 0x051026,
+                gridColor: 0xff007f,
+                trafficSpeedMult: 1.28,
+                payoutMult: 1.35,
+                unlockCost: 600,
+                unlocked: false
+            },
+            {
+                id: 2,
+                name: 'SECTOR-03: INDUSTRIAL CORE',
+                subtitle: 'Pusat reaktor cybernetic. Truk kargo rapat & bayaran tertinggi!',
+                fogColor: 0x1a0612,
+                gridColor: 0xfcee0a,
+                trafficSpeedMult: 1.5,
+                payoutMult: 1.75,
+                unlockCost: 1400,
+                unlocked: false
+            }
+        ];
+
+        const state = {
+            paused: true, // Starts with contract modal open so user sees options or clicks play
+            credits: 250,
+            dailyTarget: 1500,
+            deliveriesCompleted: 0,
+            combo: 0,
+            maxCombo: 0,
+            currentDistrict: 0,
+
+            // Player Bike Physics
+            laneIndex: 2,
+            playerX: 0,
+            playerVelX: 0,
+            speed: 190,        // KM/H
+            baseMinSpeed: 95,
+            baseCruiseSpeed: 200,
+            baseMaxSpeed: 310,
+            boostSpeedBonus: 130,
+
+            hull: 100,
+            maxHull: 100,
+            battery: 100,
+            maxBattery: 100,
+            isBoosting: false,
+
+            // Upgrades (Levels 1 - 5)
+            upgrades: {
+                engine: { level: 1, maxLevel: 5, baseCost: 180, name: 'Overclocked Thruster', desc: '+Kecepatan Puncak & Akselerasi' },
+                battery: { level: 1, maxLevel: 5, baseCost: 160, name: 'Graphene Battery Cell', desc: '+Durasi Boost & Isi Ulang Cepat' },
+                chassis: { level: 1, maxLevel: 5, baseCost: 150, name: 'Nano-Shield Chassis', desc: '+Ketahanan Hull & Reduksi Guncangan' }
+            },
+
+            // Active Contract
+            activeContract: null,
+            availableContracts: [],
+
+            // EMP & Thermal timers
+            empGlitchTimer: 0,
+            droneAttackTimer: 0,
+            droneTargetX: 0,
+            droneWarningActive: false
+        };
+
+        // Input state
+        const keys = {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            boost: false
+        };
+
+        /********************************************************************
+         * 3. CONTRACT GENERATOR & UPGRADE LOGIC
+         ********************************************************************/
+        function generateContracts() {
+            const distMult = DISTRICTS[state.currentDistrict].payoutMult;
+            const templates = [
+                {
+                    type: 'STANDARD',
+                    title: 'STANDARD DROP: NEURAL CHIP',
+                    badge: 'RESIKO RENDAH',
+                    badgeColor: 'text-cyan-300 border-cyan-400',
+                    desc: 'Pengiriman reguler komponen cyberware ke terminal klien.',
+                    distance: Math.round((1100 + Math.random() * 400)),
+                    timeLimit: 36,
+                    baseReward: Math.round(320 * distMult),
+                    fragile: false,
+                    illegal: false,
+                    thermal: false,
+                    emp: false
+                },
+                {
+                    type: 'FRAGILE',
+                    title: 'FRAGILE TECH: QUANTUM CORE',
+                    badge: 'ANTI-GUNCANGAN',
+                    badgeColor: 'text-amber-300 border-amber-400',
+                    desc: 'Kargo sangat sensitif! Tabrakan mengurangi integritas paket & komisi.',
+                    distance: Math.round((1350 + Math.random() * 450)),
+                    timeLimit: 42,
+                    baseReward: Math.round(520 * distMult),
+                    fragile: true,
+                    illegal: false,
+                    thermal: Math.random() > 0.45,
+                    emp: false
+                },
+                {
+                    type: 'SYNDICATE',
+                    title: 'SYNDICATE DATA: BLACK ICE',
+                    badge: 'ILLEGAL // DRONE ALERT',
+                    badgeColor: 'text-rose-400 border-rose-500',
+                    desc: 'Data pasar gelap! Memicu pengejaran Drone Keamanan bersenjata laser.',
+                    distance: Math.round((1550 + Math.random() * 500)),
+                    timeLimit: 44,
+                    baseReward: Math.round(760 * distMult),
+                    fragile: false,
+                    illegal: true,
+                    thermal: false,
+                    emp: Math.random() > 0.35
+                }
+            ];
+
+            state.availableContracts = templates;
+            renderContractCards();
+        }
+
+        function selectContract(index) {
+            const chosen = state.availableContracts[index];
+            if (!chosen) return;
+
+            state.activeContract = {
+                ...chosen,
+                remainingDist: chosen.distance,
+                remainingTime: chosen.timeLimit,
+                integrity: 100,   // Used for Fragile cargo
+                thermalHeat: 20,  // Used for Thermal Core (0-100%, fails or damages at 100%)
+                beaconSpawned: false
+            };
+
+            // Reset drone state
+            if (droneGroup) {
+                droneGroup.visible = chosen.illegal;
+            }
+            if (laserHazardMesh) {
+                laserHazardMesh.visible = false;
+            }
+            state.droneWarningActive = false;
+            state.droneAttackTimer = 3.5;
+
+            updateContractHUD();
+            showToast(`KONTRAK AKTIF: ${chosen.title}`, `Target Jarak: ${chosen.distance}M | Hadiah: ¢${chosen.baseReward}`);
+            closeHubModal();
+        }
+
+        /********************************************************************
+         * 4. THREE.JS 3D CYBERPUNK WORLD & HOVERBIKE SETUP
+         ********************************************************************/
+        const canvas = document.getElementById('game-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x06020f);
+        scene.fog = new THREE.FogExp2(0x090418, 0.0075);
+
+        const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 260);
+        camera.position.set(0, 4.3, 9.5);
+        camera.lookAt(0, 1.5, -18);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x443366, 1.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0x00f3ff, 1.2);
+        dirLight.position.set(15, 35, 20);
+        scene.add(dirLight);
+
+        // Highway Road Plane
+        const roadGeo = new THREE.PlaneGeometry(24, 320);
+        const roadMat = new THREE.MeshStandardMaterial({
+            color: 0x090814,
+            roughness: 0.35,
+            metalness: 0.7
+        });
+        const roadMesh = new THREE.Mesh(roadGeo, roadMat);
+        roadMesh.rotation.x = -Math.PI / 2;
+        roadMesh.position.z = -130;
+        scene.add(roadMesh);
+
+        // Neon Side Guardrails
+        const railGeo = new THREE.BoxGeometry(0.4, 0.7, 320);
+        const railMatCyan = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
+        const railMatPink = new THREE.MeshBasicMaterial({ color: 0xff007f });
+
+        const leftRail = new THREE.Mesh(railGeo, railMatCyan);
+        leftRail.position.set(-11.8, 0.35, -130);
+        scene.add(leftRail);
+
+        const rightRail = new THREE.Mesh(railGeo, railMatPink);
+        rightRail.position.set(11.8, 0.35, -130);
+        scene.add(rightRail);
+
+        // Scrolling Lane Dashed Lines & Road Grid
+        const roadStripes = [];
+        const stripeGeo = new THREE.PlaneGeometry(0.18, 4.5);
+        const stripeMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, side: THREE.DoubleSide });
+
+        for (let z = 10; z > -260; z -= 12) {
+            [-6, -2, 2, 6].forEach(lx => {
+                const s = new THREE.Mesh(stripeGeo, stripeMat);
+                s.rotation.x = -Math.PI / 2;
+                s.position.set(lx, 0.03, z);
+                scene.add(s);
+                roadStripes.push(s);
+            });
+        }
+
+        // Procedural Cyberpunk Skyscrapers & Neon Street Arches
+        const cityBuildings = [];
+        const neonPalette = [0x00f3ff, 0xff007f, 0xfcee0a, 0xb500ff, 0x00ff9d];
+
+        function createBuildingTexture(accentColorHex) {
+            const c = document.createElement('canvas');
+            c.width = 64;
+            c.height = 128;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#070510';
+            ctx.fillRect(0, 0, 64, 128);
+
+            const hexStr = '#' + accentColorHex.toString(16).padStart(6, '0');
+            for (let y = 8; y < 120; y += 10) {
+                for (let x = 6; x < 58; x += 10) {
+                    if (Math.random() > 0.38) {
+                        ctx.fillStyle = Math.random() > 0.8 ? '#ffffff' : hexStr;
+                        ctx.fillRect(x, y, 5, 5);
+                    }
+                }
+            }
+            const tex = new THREE.CanvasTexture(c);
+            tex.magFilter = THREE.NearestFilter;
+            return tex;
+        }
+
+        const buildingTextures = neonPalette.map(col => createBuildingTexture(col));
+
+        for (let i = 0; i < 44; i++) {
+            const w = 8 + Math.random() * 10;
+            const h = 25 + Math.random() * 65;
+            const d = 8 + Math.random() * 10;
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const tex = buildingTextures[i % buildingTextures.length];
+            const mat = new THREE.MeshBasicMaterial({ map: tex });
+            const b = new THREE.Mesh(geo, mat);
+
+            const side = i % 2 === 0 ? -1 : 1;
+            const xPos = side * (18 + Math.random() * 20);
+            const zPos = -i * 6.5;
+            b.position.set(xPos, h / 2 - 2, zPos);
+
+            // Add glowing roof trim or holographic billboard
+            if (Math.random() > 0.45) {
+                const holoGeo = new THREE.PlaneGeometry(w * 0.8, 4.5);
+                const holoMat = new THREE.MeshBasicMaterial({
+                    color: neonPalette[i % neonPalette.length],
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.78
+                });
+                const holo = new THREE.Mesh(holoGeo, holoMat);
+                holo.position.set(side === -1 ? w / 2 + 0.2 : -w / 2 - 0.2, (Math.random() * 0.3) * h, 0);
+                holo.rotation.y = Math.PI / 2;
+                b.add(holo);
+            }
+
+            scene.add(b);
+            cityBuildings.push(b);
+        }
+
+        // Build Player Hoverbike "KAZE-01"
+        const playerGroup = new THREE.Group();
+        scene.add(playerGroup);
+
+        function buildHoverbike() {
+            // Sleek main chassis
+            const bodyGeo = new THREE.ConeGeometry(0.75, 3.4, 6);
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: 0x111827,
+                metalness: 0.85,
+                roughness: 0.2
+            });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.rotation.x = -Math.PI / 2;
+            body.position.y = 0.75;
+            playerGroup.add(body);
+
+            // Glowing Cyan Cockpit Canopy
+            const canopyGeo = new THREE.BoxGeometry(0.68, 0.42, 1.5);
+            const canopyMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
+            const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+            canopy.position.set(0, 1.02, -0.1);
+            playerGroup.add(canopy);
+
+            // Side Hover Blades / Stabilizer Wings
+            const wingGeo = new THREE.BoxGeometry(2.1, 0.12, 1.2);
+            const wingMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.8 });
+            const wings = new THREE.Mesh(wingGeo, wingMat);
+            wings.position.set(0, 0.58, 0.3);
+            playerGroup.add(wings);
+
+            // Neon Magenta Wing Strips
+            const stripGeo = new THREE.BoxGeometry(2.15, 0.06, 0.2);
+            const stripMat = new THREE.MeshBasicMaterial({ color: 0xff007f });
+            const strip = new THREE.Mesh(stripGeo, stripMat);
+            strip.position.set(0, 0.65, 0.3);
+            playerGroup.add(strip);
+
+            // Rear Twin Ion Thrusters
+            const thrusterGeo = new THREE.CylinderGeometry(0.24, 0.32, 0.6, 12);
+            const thrusterMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
+            const leftThruster = new THREE.Mesh(thrusterGeo, thrusterMat);
+            leftThruster.rotation.x = Math.PI / 2;
+            leftThruster.position.set(-0.35, 0.7, 1.65);
+            playerGroup.add(leftThruster);
+
+            const rightThruster = new THREE.Mesh(thrusterGeo, thrusterMat);
+            rightThruster.rotation.x = Math.PI / 2;
+            rightThruster.position.set(0.35, 0.7, 1.65);
+            playerGroup.add(rightThruster);
+
+            // Point Light under Hoverbike
+            const bikeLight = new THREE.PointLight(0x00f3ff, 2.2, 8);
+            bikeLight.position.set(0, 0.4, 0);
+            playerGroup.add(bikeLight);
+
+            return { leftThruster, rightThruster, bikeLight };
+        }
+
+        const bikeParts = buildHoverbike();
+        playerGroup.position.set(0, 0, 2.5);
+
+        // Thruster Exhaust Particles
+        const particles = [];
+        const particleGeo = new THREE.BoxGeometry(0.18, 0.18, 0.45);
+        for (let i = 0; i < 24; i++) {
+            const pMat = new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x00f3ff : 0xff007f, transparent: true, opacity: 0.85 });
+            const p = new THREE.Mesh(particleGeo, pMat);
+            p.visible = false;
+            scene.add(p);
+            particles.push({ mesh: p, life: 0 });
+        }
+
+        // Security Drone (Chases player during Illegal Syndicate Contracts)
+        const droneGroup = new THREE.Group();
+        const droneCore = new THREE.Mesh(
+            new THREE.OctahedronGeometry(0.75, 0),
+            new THREE.MeshStandardMaterial({ color: 0x220008, metalness: 0.9, roughness: 0.2 })
+        );
+        const droneEye = new THREE.Mesh(
+            new THREE.SphereGeometry(0.32, 12, 12),
+            new THREE.MeshBasicMaterial({ color: 0xff003c })
+        );
+        droneEye.position.z = 0.55;
+        droneGroup.add(droneCore);
+        droneGroup.add(droneEye);
+        droneGroup.position.set(0, 4.2, -10);
+        droneGroup.visible = false;
+        scene.add(droneGroup);
+
+        // Laser Lock-on Strip on Highway for Drone Attacks
+        const laserHazardGeo = new THREE.PlaneGeometry(2.8, 120);
+        const laserHazardMat = new THREE.MeshBasicMaterial({
+            color: 0xff003c,
+            transparent: true,
+            opacity: 0.45,
+            side: THREE.DoubleSide
+        });
+        const laserHazardMesh = new THREE.Mesh(laserHazardGeo, laserHazardMat);
+        laserHazardMesh.rotation.x = -Math.PI / 2;
+        laserHazardMesh.position.set(0, 0.06, -45);
+        laserHazardMesh.visible = false;
+        scene.add(laserHazardMesh);
+
+        // Delivery Drop-off Beacon Gate (Appears when nearing contract destination)
+        const beaconGroup = new THREE.Group();
+        const pillarGeo = new THREE.BoxGeometry(0.8, 9, 0.8);
+        const pillarMat = new THREE.MeshBasicMaterial({ color: 0x00ff9d });
+        const leftPillar = new THREE.Mesh(pillarGeo, pillarMat);
+        leftPillar.position.set(-11, 4.5, 0);
+        const rightPillar = new THREE.Mesh(pillarGeo, pillarMat);
+        rightPillar.position.set(11, 4.5, 0);
+        const topBeam = new THREE.Mesh(new THREE.BoxGeometry(23, 1.0, 0.8), pillarMat);
+        topBeam.position.set(0, 9, 0);
+        const portalPlane = new THREE.Mesh(
+            new THREE.PlaneGeometry(22, 9),
+            new THREE.MeshBasicMaterial({ color: 0x00ff9d, transparent: true, opacity: 0.25, side: THREE.DoubleSide })
+        );
+        portalPlane.position.set(0, 4.5, 0);
+        beaconGroup.add(leftPillar, rightPillar, topBeam, portalPlane);
+        beaconGroup.visible = false;
+        scene.add(beaconGroup);
+
+        /********************************************************************
+         * 5. TRAFFIC VEHICLES & ENERGY RECHARGE PADS POOL
+         ********************************************************************/
+        const trafficList = [];
+
+        function createTrafficVehicle(isTruck, laneIdx, zPos) {
+            const group = new THREE.Group();
+            const width = isTruck ? 2.4 : 1.75;
+            const height = isTruck ? 2.6 : 1.15;
+            const length = isTruck ? 7.2 : 3.8;
+
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: isTruck ? 0x1e1b2e : 0x141d2f,
+                metalness: 0.75,
+                roughness: 0.3
+            });
+            const body = new THREE.Mesh(new THREE.BoxGeometry(width, height, length), bodyMat);
+            body.position.y = height / 2 + 0.15;
+            group.add(body);
+
+            // Red Rear Taillights Bar
+            const tailMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
+            const tail = new THREE.Mesh(new THREE.BoxGeometry(width * 0.85, 0.22, 0.1), tailMat);
+            tail.position.set(0, height * 0.45, length / 2 + 0.02);
+            group.add(tail);
+
+            // Roof Neon Accent
+            const roofColor = isTruck ? 0xfcee0a : 0x00f3ff;
+            const roofStrip = new THREE.Mesh(
+                new THREE.BoxGeometry(width * 0.6, 0.08, length * 0.7),
+                new THREE.MeshBasicMaterial({ color: roofColor })
+            );
+            roofStrip.position.set(0, height + 0.16, 0);
+            group.add(roofStrip);
+
+            const x = LANE_X[laneIdx];
+            group.position.set(x, 0, zPos);
+            scene.add(group);
+
+            return {
+                group,
+                isTruck,
+                laneIdx,
+                targetX: x,
+                width,
+                length,
+                speed: isTruck ? 95 : (115 + Math.random() * 35),
+                nearMissAwarded: false,
+                switchCooldown: 2 + Math.random() * 4
+            };
+        }
+
+        // Populate initial traffic
+        for (let i = 0; i < 14; i++) {
+            const isTruck = i % 4 === 0;
+            const laneIdx = Math.floor(Math.random() * 5);
+            const zPos = -25 - i * 19;
+            trafficList.push(createTrafficVehicle(isTruck, laneIdx, zPos));
+        }
+
+        // Highway Energy Recharge Pads
+        const energyPads = [];
+        const padGeo = new THREE.PlaneGeometry(2.6, 7.5);
+        const padMat = new THREE.MeshBasicMaterial({
+            color: 0x00ffaa,
+            transparent: true,
+            opacity: 0.65,
+            side: THREE.DoubleSide
+        });
+
+        for (let i = 0; i < 3; i++) {
+            const mesh = new THREE.Mesh(padGeo, padMat);
+            mesh.rotation.x = -Math.PI / 2;
+            const lane = Math.floor(Math.random() * 5);
+            mesh.position.set(LANE_X[lane], 0.05, -60 - i * 85);
+            scene.add(mesh);
+            energyPads.push({ mesh, active: true });
+        }
+
+        /********************************************************************
+         * 6. HUD & MODAL UI FUNCTIONS
+         ********************************************************************/
+        let toastTimeout = null;
+        function showToast(title, subtitle) {
+            const toast = document.getElementById('hud-toast');
+            document.getElementById('hud-toast-title').textContent = title;
+            document.getElementById('hud-toast-sub').textContent = subtitle;
+            toast.classList.remove('opacity-0', '-translate-y-4');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-4');
+            }, 2600);
+        }
+
+        function triggerDamageFlash() {
+            const flash = document.getElementById('damage-flash');
+            flash.style.opacity = '1';
+            setTimeout(() => { flash.style.opacity = '0'; }, 180);
+        }
+
+        function updateContractHUD() {
+            const c = state.activeContract;
+            if (!c) return;
+
+            document.getElementById('hud-contract-title').textContent = c.title;
+            document.getElementById('hud-contract-reward').textContent = `+¢${c.baseReward}`;
+            document.getElementById('hud-distance').textContent = `${Math.max(0, Math.round(c.remainingDist))} M`;
+            document.getElementById('hud-timer').textContent = `${Math.max(0, c.remainingTime).toFixed(1)}s`;
+
+            // Modifiers badges
+            const modWrap = document.getElementById('hud-modifiers');
+            modWrap.innerHTML = '';
+            if (c.fragile) {
+                modWrap.innerHTML += `<span class="text-[10px] font-cyber bg-amber-950/90 text-amber-300 border border-amber-400/50 px-1.5 py-0.5 rounded">📦 FRAGILE CARGO</span>`;
+            }
+            if (c.illegal) {
+                modWrap.innerHTML += `<span class="text-[10px] font-cyber bg-rose-950/90 text-rose-300 border border-rose-500/50 px-1.5 py-0.5 rounded">🚨 DRONE KEAMANAN</span>`;
+            }
+            if (c.thermal) {
+                modWrap.innerHTML += `<span class="text-[10px] font-cyber bg-orange-950/90 text-orange-300 border border-orange-400/50 px-1.5 py-0.5 rounded">🔥 THERMAL CORE (&gt;210 KM/H)</span>`;
+            }
+            if (c.emp) {
+                modWrap.innerHTML += `<span class="text-[10px] font-cyber bg-purple-950/90 text-purple-300 border border-purple-400/50 px-1.5 py-0.5 rounded">⚡ EMP GLITCH</span>`;
+            }
+
+            // Special Integrity / Thermal Bar
+            const specialWrap = document.getElementById('hud-special-wrap');
+            const specialLabel = document.getElementById('hud-special-label');
+            const specialVal = document.getElementById('hud-special-val');
+            const specialBar = document.getElementById('hud-special-bar');
+
+            if (c.fragile) {
+                specialWrap.classList.remove('hidden');
+                specialLabel.textContent = 'INTEGRITAS PAKET FRAGILE';
+                specialVal.textContent = `${Math.round(c.integrity)}%`;
+                specialBar.style.width = `${c.integrity}%`;
+            } else if (c.thermal) {
+                specialWrap.classList.remove('hidden');
+                specialLabel.textContent = 'SUHU THERMAL CORE (JAGA >210 KM/H)';
+                specialVal.textContent = `${Math.round(c.thermalHeat)}%`;
+                specialBar.style.width = `${c.thermalHeat}%`;
+            } else {
+                specialWrap.classList.add('hidden');
+            }
+        }
+
+        function updateTelemetryHUD() {
+            document.getElementById('hud-credits').textContent = `¢ ${state.credits}`;
+            document.getElementById('modal-credits').textContent = `¢ ${state.credits}`;
+            document.getElementById('hud-deliveries').textContent = state.deliveriesCompleted;
+            document.getElementById('hud-max-combo').textContent = `${state.maxCombo}x`;
+
+            const dailyPct = Math.min(100, Math.round((state.credits / state.dailyTarget) * 100));
+            document.getElementById('hud-daily-text').textContent = `¢${state.credits} / ¢${state.dailyTarget}`;
+            document.getElementById('hud-daily-bar').style.width = `${dailyPct}%`;
+
+            const hullPct = Math.max(0, Math.round((state.hull / state.maxHull) * 100));
+            document.getElementById('hud-hull-text').textContent = `${hullPct}%`;
+            document.getElementById('hud-hull-bar').style.width = `${hullPct}%`;
+
+            const boostPct = Math.max(0, Math.round((state.battery / state.maxBattery) * 100));
+            document.getElementById('hud-boost-text').textContent = `${boostPct}%`;
+            document.getElementById('hud-boost-bar').style.width = `${boostPct}%`;
+
+            document.getElementById('hud-speed').textContent = Math.round(state.speed);
+
+            // Combo display
+            document.getElementById('hud-combo-count').textContent = `${state.combo}x`;
+            document.getElementById('hud-combo-bonus').textContent = `+¢${state.combo * 15}`;
+        }
+
+        function renderContractCards() {
+            const container = document.getElementById('contract-cards-container');
+            container.innerHTML = '';
+
+            state.availableContracts.forEach((c, idx) => {
+                const tags = [];
+                if (c.fragile) tags.push('📦 Fragile Integrity');
+                if (c.illegal) tags.push('🚨 Drone Pursuit');
+                if (c.thermal) tags.push('🔥 Thermal Speed Lock');
+                if (c.emp) tags.push('⚡ EMP HUD Scramble');
+                if (tags.length === 0) tags.push('✅ Jalur Aman Standar');
+
+                const card = document.createElement('div');
+                card.className = 'cyber-panel p-4 flex flex-col justify-between border border-cyan-500/40 hover:border-cyan-300 transition';
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <span class="text-[10px] font-cyber px-2 py-0.5 rounded border ${c.badgeColor} bg-slate-950">${c.badge}</span>
+                            <span class="font-cyber text-base font-black text-yellow-300 neon-text-yellow">+¢${c.baseReward}</span>
+                        </div>
+                        <h4 class="font-cyber text-sm font-black text-white mb-1">${c.title}</h4>
+                        <p class="text-xs text-slate-300 mb-3">${c.desc}</p>
+                        <div class="grid grid-cols-2 gap-2 text-xs bg-slate-950/80 p-2 rounded border border-slate-800 mb-3">
+                            <div><span class="text-slate-400">JARAK:</span> <strong class="font-cyber text-cyan-300">${c.distance}M</strong></div>
+                            <div><span class="text-slate-400">BATAS:</span> <strong class="font-cyber text-yellow-300">${c.timeLimit}s</strong></div>
+                        </div>
+                        <div class="space-y-1 mb-4">
+                            ${tags.map(t => `<div class="text-[11px] font-semibold text-fuchsia-300">${t}</div>`).join('')}
+                        </div>
+                    </div>
+                    <button data-contract-idx="${idx}" class="btn-pick-contract cyber-btn w-full py-2.5 font-cyber text-xs font-black tracking-wider">
+                        TERIMA KONTRAK INI ▶
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+
+            container.querySelectorAll('.btn-pick-contract').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.getAttribute('data-contract-idx'), 10);
+                    selectContract(idx);
+                });
+            });
+        }
+
+        function renderGarageAndDistricts() {
+            // Render Upgrades
+            const upContainer = document.getElementById('upgrade-cards-container');
+            upContainer.innerHTML = '';
+
+            Object.keys(state.upgrades).forEach(key => {
+                const up = state.upgrades[key];
+                const cost = up.baseCost * up.level;
+                const isMax = up.level >= up.maxLevel;
+                const canAfford = state.credits >= cost && !isMax;
+
+                const card = document.createElement('div');
+                card.className = 'cyber-panel p-4 flex flex-col justify-between';
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-cyber text-xs font-black text-cyan-300">${up.name}</span>
+                            <span class="font-cyber text-xs text-fuchsia-400 font-bold">LVL ${up.level}/${up.maxLevel}</span>
+                        </div>
+                        <p class="text-xs text-slate-300 mb-3">${up.desc}</p>
+                        <div class="w-full flex gap-1 mb-4">
+                            ${Array.from({ length: up.maxLevel }).map((_, i) => `
+                                <div class="h-2 flex-1 rounded ${i < up.level ? 'bg-cyan-400 shadow-[0_0_8px_#00f3ff]' : 'bg-slate-800'}"></div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <button data-upgrade-key="${key}" ${!canAfford ? 'disabled' : ''} class="btn-buy-upgrade cyber-btn w-full py-2 font-cyber text-xs font-bold">
+                        ${isMax ? 'LEVEL MAKSIMUM' : `UPGRADE (¢${cost})`}
+                    </button>
+                `;
+                upContainer.appendChild(card);
+            });
+
+            upContainer.querySelectorAll('.btn-buy-upgrade').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const key = btn.getAttribute('data-upgrade-key');
+                    const up = state.upgrades[key];
+                    const cost = up.baseCost * up.level;
+                    if (state.credits >= cost && up.level < up.maxLevel) {
+                        state.credits -= cost;
+                        up.level++;
+                        if (key === 'chassis') {
+                            state.maxHull = 100 + (up.level - 1) * 25;
+                            state.hull = state.maxHull;
+                        }
+                        if (key === 'battery') {
+                            state.maxBattery = 100 + (up.level - 1) * 25;
+                            state.battery = state.maxBattery;
+                        }
+                        audio.playDeliverySuccess();
+                        updateTelemetryHUD();
+                        renderGarageAndDistricts();
+                    }
+                });
+            });
+
+            // Render Districts
+            const distContainer = document.getElementById('district-cards-container');
+            distContainer.innerHTML = '';
+
+            DISTRICTS.forEach((d, idx) => {
+                const isCurrent = state.currentDistrict === idx;
+                const canUnlock = !d.unlocked && state.credits >= d.unlockCost;
+
+                const card = document.createElement('div');
+                card.className = `cyber-panel p-4 flex flex-col justify-between ${isCurrent ? 'border-2 border-fuchsia-400' : ''}`;
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-cyber text-xs font-black text-fuchsia-300">${d.name}</span>
+                            <span class="text-[11px] font-cyber text-yellow-300">KOMISI ${Math.round(d.payoutMult * 100)}%</span>
+                        </div>
+                        <p class="text-xs text-slate-300 mb-3">${d.subtitle}</p>
+                    </div>
+                    <button data-dist-idx="${idx}" ${(!d.unlocked && !canUnlock) || isCurrent ? 'disabled' : ''} class="btn-select-dist cyber-btn w-full py-2 font-cyber text-xs font-bold">
+                        ${isCurrent ? '📍 ZONA AKTIF SAAT INI' : (d.unlocked ? 'PINDAH KE DISTRIK INI' : `BUKA AKSES (¢${d.unlockCost})`)}
+                    </button>
+                `;
+                distContainer.appendChild(card);
+            });
+
+            distContainer.querySelectorAll('.btn-select-dist').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.getAttribute('data-dist-idx'), 10);
+                    const d = DISTRICTS[idx];
+                    if (!d.unlocked && state.credits >= d.unlockCost) {
+                        state.credits -= d.unlockCost;
+                        d.unlocked = true;
+                    }
+                    if (d.unlocked) {
+                        state.currentDistrict = idx;
+                        applyDistrictVisuals(d);
+                        generateContracts();
+                        updateTelemetryHUD();
+                        renderGarageAndDistricts();
+                    }
+                });
+            });
+        }
+
+        function applyDistrictVisuals(district) {
+            scene.fog.color.setHex(district.fogColor);
+            stripeMat.color.setHex(district.gridColor);
+            document.getElementById('hud-district-name').textContent = district.name;
+        }
+
+        function openHubModal(defaultTab = 'contracts') {
+            state.paused = true;
+            document.getElementById('hub-modal').classList.remove('hidden');
+            switchModalTab(defaultTab);
+            renderContractCards();
+            renderGarageAndDistricts();
+            updateTelemetryHUD();
+        }
+
+        function closeHubModal() {
+            audio.init();
+            if (!state.activeContract) {
+                selectContract(0);
+            }
+            state.paused = false;
+            document.getElementById('hub-modal').classList.add('hidden');
+        }
+
+        function switchModalTab(tab) {
+            const cTab = document.getElementById('tab-content-contracts');
+            const gTab = document.getElementById('tab-content-garage');
+            const cBtn = document.getElementById('tab-btn-contracts');
+            const gBtn = document.getElementById('tab-btn-garage');
+
+            if (tab === 'contracts') {
+                cTab.classList.remove('hidden');
+                gTab.classList.add('hidden');
+                cBtn.className = 'px-4 py-2 font-cyber text-xs sm:text-sm font-bold border-b-2 border-cyan-400 text-cyan-300 bg-cyan-950/40';
+                gBtn.className = 'px-4 py-2 font-cyber text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200';
+            } else {
+                cTab.classList.add('hidden');
+                gTab.classList.remove('hidden');
+                gBtn.className = 'px-4 py-2 font-cyber text-xs sm:text-sm font-bold border-b-2 border-fuchsia-400 text-fuchsia-300 bg-fuchsia-950/40';
+                cBtn.className = 'px-4 py-2 font-cyber text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200';
+            }
+        }
+
+        /********************************************************************
+         * 7. INPUT LISTENERS (KEYBOARD + TOUCH + UI BUTTONS)
+         ********************************************************************/
+        window.addEventListener('keydown', (e) => {
+            const code = e.code;
+            if (code === 'KeyW' || code === 'ArrowUp') keys.up = true;
+            if (code === 'KeyS' || code === 'ArrowDown') keys.down = true;
+            if (code === 'KeyA' || code === 'ArrowLeft') keys.left = true;
+            if (code === 'KeyD' || code === 'ArrowRight') keys.right = true;
+            if (code === 'ShiftLeft' || code === 'ShiftRight' || code === 'Space') {
+                if (!keys.boost && !state.paused && state.battery > 10) audio.playBoost();
+                keys.boost = true;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const code = e.code;
+            if (code === 'KeyW' || code === 'ArrowUp') keys.up = false;
+            if (code === 'KeyS' || code === 'ArrowDown') keys.down = false;
+            if (code === 'KeyA' || code === 'ArrowLeft') keys.left = false;
+            if (code === 'KeyD' || code === 'ArrowRight') keys.right = false;
+            if (code === 'ShiftLeft' || code === 'ShiftRight' || code === 'Space') keys.boost = false;
+        });
+
+        // Touch / Click Hold Helper
+        function bindHoldButton(btnId, keyProp) {
+            const el = document.getElementById(btnId);
+            if (!el) return;
+            const start = (ev) => {
+                ev.preventDefault();
+                if (keyProp === 'boost' && !keys.boost && state.battery > 10) audio.playBoost();
+                keys[keyProp] = true;
+            };
+            const end = (ev) => {
+                ev.preventDefault();
+                keys[keyProp] = false;
+            };
+            el.addEventListener('mousedown', start);
+            el.addEventListener('mouseup', end);
+            el.addEventListener('mouseleave', end);
+            el.addEventListener('touchstart', start, { passive: false });
+            el.addEventListener('touchend', end, { passive: false });
+        }
+
+        bindHoldButton('touch-left', 'left');
+        bindHoldButton('touch-right', 'right');
+        bindHoldButton('touch-gas', 'up');
+        bindHoldButton('touch-brake', 'down');
+        bindHoldButton('touch-boost', 'boost');
+
+        // UI Button Listeners
+        document.getElementById('btn-open-contracts').addEventListener('click', () => openHubModal('contracts'));
+        document.getElementById('btn-open-garage').addEventListener('click', () => openHubModal('garage'));
+        document.getElementById('btn-resume-game').addEventListener('click', closeHubModal);
+        document.getElementById('tab-btn-contracts').addEventListener('click', () => switchModalTab('contracts'));
+        document.getElementById('tab-btn-garage').addEventListener('click', () => switchModalTab('garage'));
+        document.getElementById('btn-refresh-contracts').addEventListener('click', () => {
+            generateContracts();
+            audio.playNearMiss();
+        });
+
+        document.getElementById('btn-audio-toggle').addEventListener('click', (e) => {
+            audio.enabled = !audio.enabled;
+            e.currentTarget.textContent = audio.enabled ? '🔊 SFX' : '🔇 MUTE';
+        });
+
+        document.getElementById('btn-repair-quick').addEventListener('click', () => {
+            if (state.credits >= 100 && state.hull < state.maxHull) {
+                state.credits -= 100;
+                state.hull = state.maxHull;
+                state.battery = state.maxBattery;
+                audio.playDeliverySuccess();
+                showToast('REPARASI NANO SELESAI', 'Hull & Baterai kembali 100%!');
+                updateTelemetryHUD();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        /********************************************************************
+         * 8. MAIN GAMEPLAY LOOP & PHYSICS ENGINE
+         ********************************************************************/
+        const clock = new THREE.Clock();
+
+        function completeContract() {
+            const c = state.activeContract;
+            if (!c) return;
+
+            const integrityFactor = c.fragile ? (c.integrity / 100) : 1;
+            const comboBonus = state.combo * 15;
+            const earned = Math.round(c.baseReward * integrityFactor) + comboBonus;
+
+            state.credits += earned;
+            state.deliveriesCompleted++;
+            audio.playDeliverySuccess();
+
+            showToast(
+                'PENGIRIMAN SUKSES!',
+                `+¢${earned} Kredit Diterima (Bonus Combo: ¢${comboBonus})`
+            );
+
+            beaconGroup.visible = false;
+            generateContracts();
+            // Automatically queue next contract or let user keep riding seamlessly
+            selectContract(Math.floor(Math.random() * state.availableContracts.length));
+            updateTelemetryHUD();
+        }
+
+        function failContract(reason) {
+            audio.playCrash();
+            state.combo = 0;
+            beaconGroup.visible = false;
+            showToast('KONTRAK GAGAL!', `${reason} — Mengambil kontrak darurat baru...`);
+            generateContracts();
+            selectContract(0);
+            updateTelemetryHUD();
+        }
+
+        function updateGame(dt) {
+            if (state.paused) {
+                audio.updateEngine(0, false, true);
+                return;
+            }
+
+            const engineLvl = state.upgrades.engine.level;
+            const batteryLvl = state.upgrades.battery.level;
+            const chassisLvl = state.upgrades.chassis.level;
+
+            const maxNormalSpeed = state.baseMaxSpeed + (engineLvl - 1) * 28;
+            const cruiseSpeed = state.baseCruiseSpeed + (engineLvl - 1) * 18;
+
+            // 1. Boost & Battery Management
+            state.isBoosting = keys.boost && state.battery > 1;
+            if (state.isBoosting) {
+                const drainRate = Math.max(12, 26 - (batteryLvl - 1) * 3);
+                state.battery = Math.max(0, state.battery - drainRate * dt);
+            } else {
+                const rechargeRate = 9 + (batteryLvl - 1) * 3.5;
+                state.battery = Math.min(state.maxBattery, state.battery + rechargeRate * dt);
+            }
+
+            // 2. Speed Acceleration / Braking
+            let targetSpeed = cruiseSpeed;
+            if (keys.up) targetSpeed = maxNormalSpeed;
+            if (keys.down) targetSpeed = state.baseMinSpeed;
+            if (state.isBoosting) targetSpeed = maxNormalSpeed + state.boostSpeedBonus;
+
+            const accelRate = state.isBoosting ? 9.5 : 4.2;
+            state.speed += (targetSpeed - state.speed) * accelRate * dt;
+
+            // Speed lines & Camera FOV dynamic zoom
+            const speedLinesEl = document.getElementById('speed-lines');
+            speedLinesEl.style.opacity = state.isBoosting ? '1' : '0';
+            const targetFov = state.isBoosting ? 76 : (60 + (state.speed / 450) * 10);
+            camera.fov += (targetFov - camera.fov) * 6 * dt;
+            camera.updateProjectionMatrix();
+
+            // Update Engine Audio
+            audio.updateEngine(state.speed / 420, state.isBoosting, false);
+
+            // 3. Lateral Steering & Banking Physics
+            const steerSpeed = 14.5 + (engineLvl - 1) * 1.2;
+            let moveDir = 0;
+            if (keys.left) moveDir -= 1;
+            if (keys.right) moveDir += 1;
+
+            state.playerVelX = THREE.MathUtils.lerp(state.playerVelX, moveDir * steerSpeed, 10 * dt);
+            state.playerX += state.playerVelX * dt;
+            state.playerX = THREE.MathUtils.clamp(state.playerX, -9.6, 9.6);
+
+            playerGroup.position.x = state.playerX;
+            // Hover oscillation
+            playerGroup.position.y = Math.sin(clock.elapsedTime * 8) * 0.12;
+            // Banking tilt
+            playerGroup.rotation.z = THREE.MathUtils.lerp(playerGroup.rotation.z, -state.playerVelX * 0.045, 10 * dt);
+            playerGroup.rotation.y = THREE.MathUtils.lerp(playerGroup.rotation.y, -state.playerVelX * 0.018, 10 * dt);
+
+            // Camera smooth follow X
+            camera.position.x = THREE.MathUtils.lerp(camera.position.x, state.playerX * 0.65, 6 * dt);
+
+            // 4. Thruster Exhaust Particle Trail
+            particles.forEach((p) => {
+                if (p.life <= 0) {
+                    if (Math.random() < (state.isBoosting ? 0.9 : 0.45)) {
+                        p.life = 1.0;
+                        p.mesh.visible = true;
+                        p.mesh.position.set(
+                            playerGroup.position.x + (Math.random() - 0.5) * 0.7,
+                            0.65 + (Math.random() - 0.5) * 0.2,
+                            playerGroup.position.z + 1.8
+                        );
+                    }
+                } else {
+                    p.life -= dt * 4.5;
+                    p.mesh.position.z += dt * 32;
+                    p.mesh.scale.setScalar(Math.max(0.1, p.life));
+                    if (p.life <= 0) p.mesh.visible = false;
+                }
+            });
+
+            // 5. World Scrolling (Road Stripes, Skyscrapers, Energy Pads)
+            const worldMoveZ = (state.speed * 0.28) * dt;
+
+            roadStripes.forEach(s => {
+                s.position.z += worldMoveZ;
+                if (s.position.z > 14) s.position.z -= 264;
+            });
+
+            cityBuildings.forEach(b => {
+                b.position.z += worldMoveZ;
+                if (b.position.z > 25) b.position.z -= 286;
+            });
+
+            energyPads.forEach(pad => {
+                pad.mesh.position.z += worldMoveZ;
+                // Check player pickup
+                if (pad.active && Math.abs(pad.mesh.position.z - playerGroup.position.z) < 3.6 && Math.abs(pad.mesh.position.x - state.playerX) < 1.9) {
+                    pad.active = false;
+                    state.battery = Math.min(state.maxBattery, state.battery + 35);
+                    state.hull = Math.min(state.maxHull, state.hull + 15);
+                    audio.playNearMiss();
+                    showToast('ENERGI & NANO-HULL TERISI!', '+35% Baterai Boost | +15% Hull');
+                }
+                if (pad.mesh.position.z > 15) {
+                    pad.mesh.position.z = -220 - Math.random() * 60;
+                    pad.mesh.position.x = LANE_X[Math.floor(Math.random() * 5)];
+                    pad.active = true;
+                }
+            });
+
+            // 6. Traffic Vehicles Movement, Lane Switching & Collision / Near-Miss
+            const distTrafficMult = DISTRICTS[state.currentDistrict].trafficSpeedMult;
+
+            trafficList.forEach(v => {
+                const relSpeedZ = ((state.speed - v.speed * distTrafficMult) * 0.28) * dt;
+                v.group.position.z += relSpeedZ;
+
+                // Autonomous lane changing behavior
+                v.switchCooldown -= dt;
+                if (v.switchCooldown <= 0 && v.group.position.z < -35) {
+                    v.switchCooldown = 3.5 + Math.random() * 4;
+                    if (!v.isTruck && Math.random() > 0.5) {
+                        const dir = Math.random() > 0.5 ? 1 : -1;
+                        v.laneIdx = THREE.MathUtils.clamp(v.laneIdx + dir, 0, 4);
+                        v.targetX = LANE_X[v.laneIdx];
+                    }
+                }
+                v.group.position.x = THREE.MathUtils.lerp(v.group.position.x, v.targetX, 4 * dt);
+
+                // Check Collision with Player Hoverbike
+                const dz = Math.abs(v.group.position.z - playerGroup.position.z);
+                const dx = Math.abs(v.group.position.x - state.playerX);
+                const hitZ = (v.length / 2) + 1.3;
+                const hitX = (v.width / 2) + 0.65;
+
+                if (dz < hitZ && dx < hitX) {
+                    // Collision!
+                    audio.playCrash();
+                    triggerDamageFlash();
+
+                    const dmgReduction = 1 - (chassisLvl - 1) * 0.12;
+                    const hullDmg = Math.round((v.isTruck ? 26 : 16) * dmgReduction);
+                    state.hull = Math.max(0, state.hull - hullDmg);
+                    state.speed = Math.max(90, state.speed * 0.55);
+                    state.combo = 0;
+
+                    // Fragile package penalty
+                    if (state.activeContract && state.activeContract.fragile) {
+                        state.activeContract.integrity = Math.max(0, state.activeContract.integrity - Math.round(25 * dmgReduction));
+                        if (state.activeContract.integrity <= 0) {
+                            failContract('PAKET FRAGILE HANCUR');
+                        }
+                    }
+
+                    // Respawn collided vehicle far ahead
+                    v.group.position.z = -240 - Math.random() * 40;
+                    v.laneIdx = Math.floor(Math.random() * 5);
+                    v.targetX = LANE_X[v.laneIdx];
+                    v.group.position.x = v.targetX;
+                    v.nearMissAwarded = false;
+
+                    if (state.hull <= 0) {
+                        state.hull = state.maxHull;
+                        state.credits = Math.max(0, state.credits - 80);
+                        failContract('HOVERBIKE RUSAK PARAH (-¢80 BIAYA DEREK)');
+                    }
+                } else if (!v.nearMissAwarded && v.group.position.z > playerGroup.position.z && dx < hitX + 1.35 && state.speed > 210) {
+                    // Near-Miss Combo!
+                    v.nearMissAwarded = true;
+                    state.combo++;
+                    if (state.combo > state.maxCombo) state.maxCombo = state.combo;
+                    state.battery = Math.min(state.maxBattery, state.battery + 8);
+                    audio.playNearMiss();
+
+                    const comboPanel = document.getElementById('hud-combo-panel');
+                    comboPanel.classList.remove('scale-95', 'opacity-80');
+                    comboPanel.classList.add('scale-105', 'opacity-100');
+                    setTimeout(() => {
+                        comboPanel.classList.remove('scale-105', 'opacity-100');
+                        comboPanel.classList.add('scale-95', 'opacity-80');
+                    }, 200);
+                }
+
+                // Recycle traffic behind or far ahead
+                if (v.group.position.z > 18 || v.group.position.z < -290) {
+                    v.group.position.z = -245 - Math.random() * 45;
+                    v.laneIdx = Math.floor(Math.random() * 5);
+                    v.targetX = LANE_X[v.laneIdx];
+                    v.group.position.x = v.targetX;
+                    v.nearMissAwarded = false;
+                }
+            });
+
+            // 7. Active Contract Progression & Special Modifiers
+            const c = state.activeContract;
+            if (c) {
+                const metersTraveled = (state.speed * 0.24) * dt;
+                c.remainingDist = Math.max(0, c.remainingDist - metersTraveled);
+                c.remainingTime -= dt;
+
+                // Spawn Drop-off Beacon Gate when close
+                if (c.remainingDist < 180 && !c.beaconSpawned) {
+                    c.beaconSpawned = true;
+                    beaconGroup.visible = true;
+                    beaconGroup.position.z = -c.remainingDist * 1.15;
+                }
+
+                if (beaconGroup.visible) {
+                    beaconGroup.position.z = -c.remainingDist * 1.15 + playerGroup.position.z;
+                }
+
+                if (c.remainingDist <= 0) {
+                    completeContract();
+                } else if (c.remainingTime <= 0) {
+                    failContract('WAKTU PENGIRIMAN HABIS');
+                }
+
+                // Thermal Core Modifier
+                if (c.thermal) {
+                    if (state.speed < 210) {
+                        c.thermalHeat = Math.min(100, c.thermalHeat + 18 * dt);
+                        if (c.thermalHeat >= 100) {
+                            failContract('THERMAL CORE MELEDAK (TERLALU LAMBAT)');
+                        }
+                    } else {
+                        c.thermalHeat = Math.max(10, c.thermalHeat - 15 * dt);
+                    }
+                }
+
+                // EMP Glitch Cargo Modifier
+                const hudEl = document.getElementById('hud-container');
+                if (c.emp) {
+                    state.empGlitchTimer -= dt;
+                    if (state.empGlitchTimer <= 0) {
+                        state.empGlitchTimer = 5.5 + Math.random() * 3;
+                        hudEl.classList.add('emp-active');
+                        setTimeout(() => hudEl.classList.remove('emp-active'), 850);
+                    }
+                } else {
+                    hudEl.classList.remove('emp-active');
+                }
+
+                // Illegal Syndicate Security Drone Pursuit
+                const droneAlertEl = document.getElementById('hud-drone-alert');
+                if (c.illegal) {
+                    droneGroup.visible = true;
+                    droneGroup.position.x = THREE.MathUtils.lerp(droneGroup.position.x, state.droneTargetX, 4 * dt);
+                    droneGroup.position.y = 4.0 + Math.sin(clock.elapsedTime * 5) * 0.4;
+
+                    state.droneAttackTimer -= dt;
+                    if (state.droneAttackTimer <= 1.6 && !state.droneWarningActive) {
+                        state.droneWarningActive = true;
+                        state.droneTargetX = LANE_X[Math.floor(Math.random() * 5)];
+                        laserHazardMesh.position.x = state.droneTargetX;
+                        laserHazardMesh.visible = true;
+                        laserHazardMat.opacity = 0.35;
+                        droneAlertEl.classList.remove('hidden');
+                        audio.playSirenBeep();
+                    }
+
+                    if (state.droneAttackTimer <= 0) {
+                        // Laser Strike fires!
+                        laserHazardMat.opacity = 0.95;
+                        if (Math.abs(state.playerX - state.droneTargetX) < 1.55) {
+                            audio.playCrash();
+                            triggerDamageFlash();
+                            state.hull = Math.max(0, state.hull - 18);
+                            state.speed *= 0.75;
+                            showToast('TERKENA LASER DRONE KEAMANAN!', '-18% Kondisi Hull');
+                        }
+                        setTimeout(() => {
+                            laserHazardMesh.visible = false;
+                            droneAlertEl.classList.add('hidden');
+                        }, 260);
+                        state.droneWarningActive = false;
+                        state.droneAttackTimer = 4.2;
+                    }
+                } else {
+                    droneGroup.visible = false;
+                    laserHazardMesh.visible = false;
+                    droneAlertEl.classList.add('hidden');
+                }
+
+                updateContractHUD();
+            }
+
+            updateTelemetryHUD();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.1);
+            updateGame(dt);
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function () {
+            generateContracts();
+            selectContract(0);
+            openHubModal('contracts');
+            animate();
+        };
+    </script>
+</body>
+</html>
